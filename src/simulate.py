@@ -1,8 +1,5 @@
 import numpy as np
 
-from .hsic import HSIC_test
-from .kernel import gaussian_kernel_matrix
-
 
 def simulate_dat(N=100, p=5, q=5, dependence=True):
     mean = np.zeros(p)
@@ -31,11 +28,5 @@ def simulate_dat2(N=100, p = 5, q=5, rho=0.5, mean=0):
 
     cov = np.vstack((top_row, bottom_row))
 
-    sim = np.random.multivariate_normal(mean, cov, N)
-    return sim
-
-
-def test_using_HSIC(X, Y, hsic_func = HSIC_test):
-    K = gaussian_kernel_matrix(X, 2)
-    L = gaussian_kernel_matrix(Y, 2)
-    return hsic_func(K, L)
+    sim = np.random.multivariate_normal(np.full(p + q, mean), cov, N)
+    return sim[:, :p], sim[:, p:]

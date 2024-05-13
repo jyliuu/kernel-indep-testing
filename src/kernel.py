@@ -21,4 +21,3 @@ def gaussian_kernel_matrix(X, sigma=1):
 
     return K
 
-# other types of kernels?
