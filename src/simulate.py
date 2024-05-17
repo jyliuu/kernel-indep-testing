@@ -23,8 +23,8 @@ def simulate_dat2(N=100, p = 5, q=5, rho=0.5, mean=0):
     Y_cov = np.eye(q)
 
     XY_cov = np.full((p, q), rho)
-    top_row = np.hstack((X_cov, XY_cov.T))  # Horizontal stack: (A, C^T)
-    bottom_row = np.hstack((XY_cov, Y_cov))  # Horizontal stack: (C, B)
+    top_row = np.hstack((X_cov, XY_cov))  # Horizontal stack: (A, C^T)
+    bottom_row = np.hstack((XY_cov.T, Y_cov))  # Horizontal stack: (C, B)
 
     cov = np.vstack((top_row, bottom_row))
 

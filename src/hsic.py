@@ -16,7 +16,12 @@ def HSIC_test2(K, L):
     return np.trace(K @ H @ L @ H)/K.shape[0]**2
 
 
-def test_using_HSIC(X, Y, hsic_func = HSIC_test):
-    K = gaussian_kernel_matrix(X, 2)
-    L = gaussian_kernel_matrix(Y, 2)
-    return hsic_func(K, L)
+def test_using_HSIC_(X, Y, hsic_func=HSIC_test, kernel=gaussian_kernel_matrix):
+    K, sigma_X = kernel(X)
+    L, sigma_Y = kernel(Y)
+    return hsic_func(K, L), (sigma_X, sigma_Y)
+
+
+def test_using_HSIC(*args, **kwargs):
+    hsic_T, sigmas = test_using_HSIC_(*args, **kwargs)
+    return hsic_T
