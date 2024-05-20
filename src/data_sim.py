@@ -18,7 +18,7 @@ def simulate_dat(N=100, p=5, q=5, dependence=True):
     return X, Y
 
 
-def simulate_dat2(N=100, p = 5, q=5, rho=0.5, mean=0):
+def simulate_dat2(N=100, p=5, q=5, rho=0.5, mean=0):
     X_cov = np.eye(p)
     Y_cov = np.eye(q)
 
