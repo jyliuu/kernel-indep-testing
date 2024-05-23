@@ -1,4 +1,7 @@
+from concurrent.futures import ProcessPoolExecutor
+
 import numpy as np
+from dcor.independence import distance_covariance_test
 
 from src import simulate_dat2, test_using_HSIC_, gaussian_kernel_matrix, test_using_HSIC
 from src.dcor import test_using_dCor
@@ -14,7 +17,6 @@ def permutation_test(X, Y, test_method, P):
     p_val = 1 - (permutation_res < T).mean()
     return p_val, T, other_var, permutation_res
 
-
 def simulate_p_values_resampling_from_test(
         test_method,
         simulate_dat,
@@ -23,7 +25,8 @@ def simulate_p_values_resampling_from_test(
 ):
     p_vals = []
     other_vars = []
-    for _ in range(B):
+    for i in range(B):
+        print(f'Iteration: {i}')
         X, Y = simulate_dat()
 
         p_val, T, other_var, permutation_res = permutation_test(X, Y, test_method, P)
@@ -48,6 +51,16 @@ def simulate_p_values_resampling_from_dCor(N=100, B=100, P=100):
         simulate_dat=lambda: simulate_dat2(N),
         B=B, P=P
     )
+
+
+def simulate_p_values_resampling_from_dCor2(simulate_dat, B=100, P=100):
+    p_vals = []
+    for i in range(B):
+        print('Iteration:', i)
+        X, Y = simulate_dat()
+        res = distance_covariance_test(X, Y, num_resamples=P)
+        p_vals.append(res.pvalue)
+    return p_vals
 
 def get_p_values_vs_uniform(
         kernel,
@@ -83,3 +96,19 @@ def calibration():
         print(p_values)
 
     return res
+
+
+def get_rho_steps(start=0.5, end=0.001, n_steps=20):
+    steps = np.logspace(np.log10(start), np.log10(end), num=n_steps)
+    return steps
+
+
+def sim_rho_going_to_0(sim_p_vals, get_rho_steps=get_rho_steps):
+    steps = get_rho_steps()
+
+    with ProcessPoolExecutor() as executor:
+        results = np.array(list(executor.map(sim_p_vals, steps)))
+
+    means = results.mean(axis=1)
+    rejection_rates = (results < 0.05).mean(axis=1)
+    return steps, means, rejection_rates
