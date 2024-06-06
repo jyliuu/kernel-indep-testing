@@ -68,7 +68,7 @@ methods = {
 def plot_permutation_test_for(method: str):
     rhos = np.arange(0, 0.09, 0.04)
     p = q = 3
-    fig, axes = plt.subplots(1, len(rhos), figsize=(20, 5), sharex=True, sharey=True)
+    fig, axes = plt.subplots(1, len(rhos), figsize=(15, 4), sharex=True, sharey=True)
 
     for i, rho in enumerate(rhos):
         X, Y = simulate_dat2(N, rho=rho, p=p, q=q)
@@ -77,9 +77,11 @@ def plot_permutation_test_for(method: str):
         plot_permutation_test(
             permutation_res, T, p_val, ax, (0.01, 0.1)[method == "dcor"]
         )
-        ax.set_xlabel("Value", fontsize=14)
-        ax.set_ylabel("Frequency", fontsize=14)
-        ax.set_title(rf"Permutation distribution for $\rho={rho:.2f}$", fontsize=18)
+        ax.set_xlabel("Value", fontsize="large")
+        ax.set_ylabel("Frequency", fontsize="large")
+        ax.set_title(
+            rf"Permutation distribution for $\rho={rho:.2f}$", fontsize="x-large"
+        )
 
     plt.tight_layout()
     plt.savefig(f"../figures/permutation_dists/{method}_p{p}q{q}P{P}N{N}.pdf")

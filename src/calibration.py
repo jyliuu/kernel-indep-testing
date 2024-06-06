@@ -8,15 +8,50 @@ from joblib import Parallel, delayed
 
 from src import simulate_dat2, test_using_HSIC_, gaussian_kernel_matrix, test_using_HSIC
 
-# def permutation_test_(X, Y, test_method, P):
-#     N = len(X)
-#     T, other_var = test_method(X, Y)
-#     permutation_res = np.array(
-#         [test_method(X, Y[np.random.permutation(np.arange(0, N)), :])[0] for _ in range(P)]
-#     )
-#
-#     p_val = 1 - (permutation_res < T).mean()
-#     return p_val, T, other_var, permutation_res
+
+def get_power_under(
+    p_vals_methods,
+    dims=[2, 10, 100, 150],
+    rhos=[0.1, 0.05, 0.01, 0.006],
+    add_sigma_scaled=False,
+    N=100,
+    B=500,
+):
+    final_res = []
+
+    for i, (d, rho) in enumerate(zip(dims, rhos)):
+        # Plot for this particular combination
+        print("Testing dimension", d, "with rho", rho)
+
+        methods = p_vals_methods
+
+        if add_sigma_scaled:
+            sigma_scaled_wrt_dim = {
+                rf"$\sigma={s:.2f}$": partial(
+                    permutation_test_p_val,
+                    test_method=partial(
+                        test_using_HSIC, kernel=partial(gaussian_kernel_matrix, sigma=s)
+                    ),
+                    P=299,
+                )
+                for s in np.power(d, d[0.25, 0.5, 0.75, 1])
+            }
+
+            methods.update(sigma_scaled_wrt_dim)
+
+        res_for_conf = []
+        for name, method in methods.items():
+            print("Testing", name)
+            p_vals = get_p_vals_B_times(
+                method,
+                partial(simulate_dat2, N=N, rho=rho, p=d, q=d),
+                B=B,
+                parallel=True,
+            )
+            res_for_conf.append(p_vals)
+        final_res.append(res_for_conf)
+
+    return final_res
 
 
 def permutation_test_p_val(
