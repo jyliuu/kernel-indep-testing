@@ -30,3 +30,39 @@ def simulate_dat2(N=100, p=2, q=2, rho=0.5, mean=0):
 
     sim = np.random.multivariate_normal(np.full(p + q, mean), cov, N)
     return sim[:, :p], sim[:, p:]
+
+
+def simulate_dat_m1(N=100, A=5):
+    XY_2 = np.random.uniform(0, 1, size=(N, 2))
+
+    theta = np.random.uniform(0, 2 * np.pi, size=N)
+    epsilon = np.random.normal(size=(N, 2))
+
+    X1 = A * np.cos(theta) + epsilon[:, 1] / 4
+    Y1 = A * np.sin(theta) + epsilon[:, 1] / 4
+
+    return np.vstack((X1, XY_2[:, 0])).T, np.vstack((Y1, XY_2[:, 1])).T
+
+
+def simulate_dat_m2(N=100, rho=0.5):
+    XY_2 = np.random.uniform(0, 1, size=(N, 2))
+
+    X1 = np.random.uniform(-1, 1, N)
+    Y1 = np.abs(X1) ** rho * np.random.normal(size=N)
+
+    return np.vstack((X1, XY_2[:, 0])).T, np.vstack((Y1, XY_2[:, 1])).T
+
+
+def simulate_dat_m3(N=100, a=5):
+    XY_2 = np.random.uniform(0, 1, size=(N, 2))
+    X1 = np.random.uniform(-np.pi, np.pi, N)
+    Y1 = []
+    p_y_given_x = lambda y, x: 1 / (2 * np.pi) * (1 + np.sin(a * x) * np.sin(a * y))
+    for x in X1:
+        reject = True
+        while reject:
+            y = np.random.uniform(-np.pi, np.pi, size=1)
+            U = np.random.uniform(0, 1, size=1)
+            reject = p_y_given_x(y, x) < U
+        Y1.append(y[0])
+    return np.vstack((X1, XY_2[:, 0])).T, np.vstack((Y1, XY_2[:, 1])).T

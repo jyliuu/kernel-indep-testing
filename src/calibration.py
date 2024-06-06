@@ -1,99 +1,128 @@
 from concurrent.futures import ProcessPoolExecutor
+from functools import partial
+from typing import Callable, Tuple
 
 import numpy as np
 from dcor.independence import distance_covariance_test
+from joblib import Parallel, delayed
 
 from src import simulate_dat2, test_using_HSIC_, gaussian_kernel_matrix, test_using_HSIC
-from src.dcor import test_using_dCor
+
+# def permutation_test_(X, Y, test_method, P):
+#     N = len(X)
+#     T, other_var = test_method(X, Y)
+#     permutation_res = np.array(
+#         [test_method(X, Y[np.random.permutation(np.arange(0, N)), :])[0] for _ in range(P)]
+#     )
+#
+#     p_val = 1 - (permutation_res < T).mean()
+#     return p_val, T, other_var, permutation_res
 
 
-def permutation_test(X, Y, test_method, P):
+def permutation_test_p_val(
+    X: np.ndarray,
+    Y: np.ndarray,
+    test_method: Callable[[np.ndarray, np.ndarray], float],
+    P: int,
+) -> float:
     N = len(X)
-    T, other_var = test_method(X, Y)
+    T = test_method(X, Y)
     permutation_res = np.array(
-        [test_method(X, Y[np.random.permutation(np.arange(0, N)), :])[0] for _ in range(P)]
+        [test_method(X, Y[np.random.permutation(N), :]) for _ in range(P)]
     )
 
-    p_val = 1 - (permutation_res < T).mean()
-    return p_val, T, other_var, permutation_res
+    extremes = (permutation_res > T).sum()
 
-def simulate_p_values_resampling_from_test(
-        test_method,
-        simulate_dat,
-        B=100,
-        P=100
-):
-    p_vals = []
-    other_vars = []
-    for i in range(B):
-        print(f'Iteration: {i}')
+    return (1 + extremes) / (P + 1)
+
+
+def get_p_vals_B_times(
+    test_method: Callable[[np.ndarray, np.ndarray], float],
+    simulate_dat: Callable[[], Tuple[np.ndarray, np.ndarray]],
+    B: int = 100,
+    seed=14,
+    parallel=False,
+) -> np.ndarray:
+
+    def parallelizable(i):
+        print(f"Iteration: {i}")
+        np.random.seed(seed * i)
         X, Y = simulate_dat()
+        p_val = test_method(X, Y)
+        return p_val
 
-        p_val, T, other_var, permutation_res = permutation_test(X, Y, test_method, P)
+    if parallel:
+        p_vals = Parallel(n_jobs=-1)(delayed(parallelizable)(i) for i in range(B))
+    else:
+        p_vals = [parallelizable(i) for i in range(B)]
 
-        p_vals.append(p_val)
-        other_vars.append(other_var)
-
-    return p_vals, other_vars
+    return np.array(p_vals)
 
 
-def simulate_p_values_resampling_from_HSIC(N=100, B=100, P=100):
-    return simulate_p_values_resampling_from_test(
-        test_method=lambda X, Y: test_using_HSIC_(X, Y),
-        simulate_dat=lambda: simulate_dat2(N),
-        B=B, P=P
+def simulate_p_values_resampling_from_HSIC(simulate_dat, B=100, P=100):
+    return get_p_vals_B_times(
+        test_method=lambda X, Y: test_using_HSIC_(
+            X, Y, kernel=lambda Z: gaussian_kernel_matrix(Z, 100)
+        ),
+        simulate_dat=simulate_dat,
+        B=B,
+        P=P,
     )
 
 
-def simulate_p_values_resampling_from_dCor(N=100, B=100, P=100):
-    return simulate_p_values_resampling_from_test(
-        test_method=lambda X, Y: (test_using_dCor(X, Y), None),
-        simulate_dat=lambda: simulate_dat2(N),
-        B=B, P=P
-    )
-
-
-def simulate_p_values_resampling_from_dCor2(simulate_dat, B=100, P=100):
+def simulate_p_values_resampling_from_dCor(simulate_dat, B=100, P=100):
     p_vals = []
     for i in range(B):
-        print('Iteration:', i)
+        print("Iteration:", i)
         X, Y = simulate_dat()
         res = distance_covariance_test(X, Y, num_resamples=P)
         p_vals.append(res.pvalue)
     return p_vals
 
-def get_p_values_vs_uniform(
-        kernel,
-        B=100,
-        P=100,
-        N=100,
-        p=2, q=3
-):
+
+def d_cov_test_p_val(X, Y, P=100):
+    res = distance_covariance_test(X, Y, num_resamples=P)
+    return res.pvalue
+
+
+def get_p_values_vs_uniform(kernel, B=100, P=100, N=100, p=2, q=2, rho=0):
     # plot significance level against rejection rate under H0
     p_values = []
-    sigmas = []
-    for _ in range(B):
-        X, Y = simulate_dat2(N, p, q, rho=0)
-        T, sigma = test_using_HSIC_(X, Y, kernel=kernel)
-        permutation_res = np.array(
-            [test_using_HSIC(X, Y[np.random.permutation(np.arange(0, N)), :], kernel=kernel) for _ in
-             range(P)])
-
-        p_val = 1 - (permutation_res < T).mean()
+    for i in range(B):
+        np.random.seed(i * 69)
+        X, Y = simulate_dat2(N, p, q, rho)
+        p_val = permutation_test_p_val(
+            X,
+            Y,
+            test_method=partial(test_using_HSIC, kernel=kernel),
+            P=P,
+        )
         p_values.append(p_val)
-        sigmas.append(sigma)
 
-    return p_values, sigmas
+    return p_values
 
 
-def calibration():
-    res = []
+def get_p_values_from_sigma(sigma, **kwargs):
+    print(f"sigma: {sigma or 0:.2f}")
+    p_values = get_p_values_vs_uniform(
+        kernel=partial(gaussian_kernel_matrix, sigma=sigma), **kwargs
+    )
+    return sigma, p_values
 
-    for sigma in np.arange(0.5, 1.8, 0.1):
-        print(f'sigma: {sigma}')
-        p_values, _ = get_p_values_vs_uniform(kernel=lambda Z: gaussian_kernel_matrix(Z, sigma=sigma))
-        res.append((sigma, p_values))
-        print(p_values)
+
+def calibration(sigma_start=0.1, sigma_end=1, step=0.1, parallel=False, **kwargs):
+    partial_get_p_values_from_sigma = partial(get_p_values_from_sigma, **kwargs)
+
+    if parallel:
+        res = Parallel(n_jobs=-1)(
+            delayed(partial_get_p_values_from_sigma)(sigma)
+            for sigma in [*np.arange(sigma_start, sigma_end, step), None]
+        )
+    else:
+        res = [
+            partial_get_p_values_from_sigma(sigma)
+            for sigma in [*np.arange(sigma_start, sigma_end, step), None]
+        ]
 
     return res
 
